@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Pallet Tracking - Level 2 Supabase</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- NAVBAR HEADER -->
+  <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-500/30">
+          <i class="fa-solid fa-bolt text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base md:text-lg leading-tight tracking-wide">PALLET TRACKING L2</h1>
+          <p class="text-xs text-blue-400 font-medium">Powered by Supabase Engine</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2 bg-emerald-500/10 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400 border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Ultra-Fast DB</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-3xl mx-auto w-full px-4 py-5 flex-1 space-y-4">
+
+    <!-- STATS CARDS -->
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700/80 shadow-lg">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Palet</div>
+        <div class="text-xl md:text-2xl font-extrabold text-white" id="stat-total">0</div>
+      </div>
+      <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700/80 shadow-lg">
+        <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Gudang</div>
+        <div class="text-xl md:text-2xl font-extrabold text-emerald-400" id="stat-gudang">0</div>
+      </div>
+      <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700/80 shadow-lg">
+        <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Customer</div>
+        <div class="text-xl md:text-2xl font-extrabold text-blue-400" id="stat-customer">0</div>
+      </div>
+    </div>
+
+    <!-- MAIN FORM & SCANNER CARD -->
+    <div class="bg-slate-800 rounded-2xl border border-slate-700/80 shadow-xl overflow-hidden p-5 space-y-4">
+      
+      <!-- STEP 1: FORM TRANSAKSI -->
+      <div id="step-header" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Transaksi</label>
+          <select id="jenisTransaksi" onchange="toggleCustomerSelect()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
+            <option value="GATE-OUT (PENGIRIMAN)">GATE-OUT (PENGIRIMAN)</option>
+            <option value="GATE-IN (PENGEMBALIAN)">GATE-IN (PENGEMBALIAN)</option>
+          </select>
+        </div>
+
+        <div id="container-customer">
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi Tujuan Customer</label>
+          <select id="lokasiCustomer" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
+            <option value="">-- Memuat Customer... --</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nomor Job / Surat Jalan</label>
+          <input type="text" id="jobNo" placeholder="Contoh: SJ-2026-001" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
+        </div>
+
+        <button onclick="goToScanStep()" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
+          <span>Buka Kamera Pemindai</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+      <!-- STEP 2: CAMERA & CONTINUOUS SCAN -->
+      <div id="step-scan" class="hidden space-y-4">
+        
+        <button id="btn-start-cam" onclick="startCamera()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
+          <i class="fa-solid fa-camera"></i>
+          <span>Mulai Pemindaian</span>
+        </button>
+
+        <div id="reader" class="w-full rounded-2xl overflow-hidden border-2 border-dashed border-slate-600 hidden"></div>
+
+        <!-- COUNTER BAR -->
+        <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-700">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-barcode text-blue-400"></i>
+            <span class="text-sm font-semibold text-slate-300">Ter-scan:</span>
+            <span id="scan-count" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">0</span>
+          </div>
+          <button onclick="resetScannedList()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </button>
+        </div>
+
+        <!-- LIST PALET -->
+        <div id="pallet-list" class="max-h-48 overflow-y-auto border border-slate-700 p-2 rounded-xl bg-slate-900/50 space-y-1.5">
+          <div class="text-slate-500 text-center py-4 text-xs">Belum ada barcode di-scan</div>
+        </div>
+
+        <!-- SUBMIT -->
+        <button id="btn-submit" onclick="submitData()" class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Simpan Transaksi (Supabase)</span>
+        </button>
+
+        <button onclick="backToHeader()" class="w-full text-xs text-slate-400 hover:text-white font-medium py-2 transition-colors">
+          &larr; Kembali ke Form Header
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 text-white border border-slate-700 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+    <span id="toast-msg" class="text-sm font-medium">Notifikasi</span>
+  </div>
+
+  <script>
+    // INITIALIZE SUPABASE CLIENT WITH USER'S KEYS
+    const SUPABASE_URL = 'https://hfgpbykeehickbajocbk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZ3BieWtlZWhpY2tiYWpvY2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjk5NzgsImV4cCI6MjEwNjgwNTk3OH0.ovaMvzuW-afaYsEogBhYwBrzyPz2ePAFf4fHTGbKhOs';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let scannedPallets = [];
+    let html5QrcodeScanner = null;
+
+    window.onload = async function() {
+      await loadCustomers();
+      await refreshStats();
+    };
+
+    async function loadCustomers() {
+      let { data, error } = await db.from('master_customer').select('nama_customer').order('nama_customer');
+      let select = document.getElementById('lokasiCustomer');
+      select.innerHTML = '<option value="">-- Pilih Customer Target --</option>';
+      if (data && data.length > 0) {
+        data.forEach(c => select.innerHTML += `<option value="${c.nama_customer}">${c.nama_customer}</option>`);
+      } else {
+        const defaultList = ["ADM Plant 1", "ADM Plant 4", "ADM Plant 5", "TMMIN", "GAYA MOTOR", "HMMI", "HPM", "MKM"];
+        defaultList.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+      }
+    }
+
+    async function refreshStats() {
+      let { data, error } = await db.from('master_pallet').select('status_lokasi');
+      if (data) {
+        let total = data.length;
+        let gudang = data.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG').length;
+        let customer = total - gudang;
+
+        document.getElementById('stat-total').innerText = total;
+        document.getElementById('stat-gudang').innerText = gudang;
+        document.getElementById('stat-customer').innerText = customer;
+      }
+    }
+
+    function showToast(message, isError = false) {
+      let toast = document.getElementById('toast');
+      let icon = document.getElementById('toast-icon');
+      let msg = document.getElementById('toast-msg');
+
+      msg.innerText = message;
+      icon.className = isError ? "fa-solid fa-circle-xmark text-rose-400 text-lg" : "fa-solid fa-circle-check text-emerald-400 text-lg";
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+    }
+
+    function toggleCustomerSelect() {
+      let jenis = document.getElementById('jenisTransaksi').value;
+      let container = document.getElementById('container-customer');
+      if (jenis.includes("IN")) {
+        container.classList.add('opacity-30', 'pointer-events-none');
+      } else {
+        container.classList.remove('opacity-30', 'pointer-events-none');
+      }
+    }
+
+    function playBeep(isError = false) {
+      let ctx = new (window.AudioContext || window.webkitAudioContext)();
+      let osc = ctx.createOscillator();
+      osc.connect(ctx.destination);
+      osc.frequency.value = isError ? 300 : 800;
+      osc.start();
+      osc.stop(ctx.currentTime + (isError ? 0.3 : 0.1));
+    }
+
+    function goToScanStep() {
+      let jenis = document.getElementById('jenisTransaksi').value;
+      let cust = document.getElementById('lokasiCustomer').value;
+      if (!cust && jenis.includes("OUT")) {
+        showToast("Silakan pilih Lokasi Customer!", true);
+        return;
+      }
+      document.getElementById('step-header').classList.add('hidden');
+      document.getElementById('step-scan').classList.remove('hidden');
+    }
+
+    function backToHeader() {
+      stopCamera();
+      document.getElementById('step-scan').classList.add('hidden');
+      document.getElementById('step-header').classList.remove('hidden');
+    }
+
+    function stopCamera() {
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => html5QrcodeScanner.clear()).catch(() => {});
+      }
+      document.getElementById('reader').classList.add('hidden');
+      document.getElementById('btn-start-cam').classList.remove('hidden');
+    }
+
+    function startCamera() {
+      document.getElementById('btn-start-cam').classList.add('hidden');
+      document.getElementById('reader').classList.remove('hidden');
+
+      html5QrcodeScanner = new Html5Qrcode("reader");
+      const config = { fps: 15, qrbox: { width: 230, height: 230 } };
+
+      html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+        .catch(() => {
+          Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length) {
+              html5QrcodeScanner.start(devices[devices.length - 1].id, config, onScanSuccess);
+            }
+          }).catch(() => showToast("Gagal mengakses kamera HP!", true));
+        });
+    }
+
+    function onScanSuccess(decodedText) {
+      let code = decodedText.trim();
+      if (!scannedPallets.includes(code)) {
+        scannedPallets.unshift(code);
+        playBeep(false);
+        showToast("Palet " + code + " berhasil di-scan");
+        updateUI();
+      } else {
+        playBeep(true);
+        showToast("Palet " + code + " sudah ada di daftar!", true);
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('scan-count').innerText = scannedPallets.length;
+      if (scannedPallets.length === 0) {
+        document.getElementById('pallet-list').innerHTML = '<div class="text-slate-500 text-center py-4 text-xs">Belum ada barcode di-scan</div>';
+        return;
+      }
+      document.getElementById('pallet-list').innerHTML = scannedPallets.map(p => `
+        <div class="p-2.5 bg-slate-900 border border-slate-700 rounded-xl flex justify-between items-center font-mono text-xs">
+          <span class="font-bold text-slate-100">${p}</span>
+          <span class="text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">READY</span>
+        </div>
+      `).join('');
+    }
+
+    function resetScannedList() {
+      scannedPallets = [];
+      updateUI();
+      showToast("Daftar scan dibersihkan");
+    }
+
+    async function submitData() {
+      if (scannedPallets.length === 0) {
+        showToast("Belum ada palet yang di-scan!", true);
+        return;
+      }
+
+      let btn = document.getElementById('btn-submit');
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Menyimpan ke Supabase...</span>';
+      btn.disabled = true;
+
+      let jenis = document.getElementById('jenisTransaksi').value;
+      let cust = document.getElementById('lokasiCustomer').value;
+      let jobNo = document.getElementById('jobNo').value;
+      let statusBaru = jenis.includes("OUT") ? (cust || "GUDANG") : "GUDANG";
+
+      try {
+        // 1. Catat Header Transaksi
+        let { data: header, error: errHeader } = await db
+          .from('header_transaksi')
+          .insert([{ jenis_transaksi: jenis, lokasi_customer: cust, job_no: jobNo }])
+          .select()
+          .single();
+
+        if (errHeader) throw errHeader;
+
+        // 2. Persiapkan Detail & Master Pallet
+        let detailRows = scannedPallets.map(p => ({ header_id: header.id, pallet_id: p }));
+        let masterRows = scannedPallets.map(p => ({ pallet_id: p, status_lokasi: statusBaru, updated_at: new Date() }));
+
+        // 3. Upsert Master Pallet (Otomatis daftar palet baru jika belum ada)
+        let { error: errMaster } = await db.from('master_pallet').upsert(masterRows, { onConflict: 'pallet_id' });
+        if (errMaster) throw errMaster;
+
+        // 4. Catat Detail Transaksi
+        let { error: errDetail } = await db.from('detail_transaksi').insert(detailRows);
+        if (errDetail) throw errDetail;
+
+        showToast("Berhasil menyimpan " + scannedPallets.length + " palet!");
+        setTimeout(() => location.reload(), 1200);
+
+      } catch (err) {
+        showToast("Gagal menyimpan: " + err.message, true);
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i><span>Simpan Transaksi (Supabase)</span>';
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
