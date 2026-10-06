@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Pallet Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Library Export Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- NAVBAR HEADER -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid fa-chart-line text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base md:text-xl tracking-wide">MONITORING PALLET ADMIN</h1>
+          <p class="text-xs text-indigo-400 font-medium">Enterprise Asset Management Portal</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-sm"></i>
+          <span class="hidden sm:inline">Export Excel</span>
+        </button>
+        <button onclick="loadAllData()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-xl text-xs border border-slate-700 transition-all">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
+
+    <!-- STATS CARDS OVERVIEW -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Unit Palet</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-white" id="stat-total">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Di Gudang Utama</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-emerald-400" id="stat-gudang">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Tersebar di Customer</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-blue-400" id="stat-customer">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Total Transaksi</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-indigo-400" id="stat-transaksi">-</div>
+      </div>
+    </div>
+
+    <!-- TABS NAVIGATION -->
+    <div class="bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 flex gap-2 w-full md:w-fit">
+      <button id="tab-btn-status" onclick="switchTab('status')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md">
+        <i class="fa-solid fa-boxes-stacked mr-2"></i> Posisi Status Palet
+      </button>
+      <button id="tab-btn-history" onclick="switchTab('history')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-clock-rotate-left mr-2"></i> Riwayat Transaksi (Log)
+      </button>
+    </div>
+
+    <!-- TAB 1: POSISI PALET & FILTER -->
+    <div id="tab-status" class="space-y-4">
+      <!-- FILTER BAR -->
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-3 justify-between items-center">
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+          <input type="text" id="search-pallet" onkeyup="filterPallets()" placeholder="Cari ID Palet (misal: C-012)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <select id="filter-location" onchange="filterPallets()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none">
+            <option value="ALL">-- Semua Lokasi --</option>
+            <option value="GUDANG">Gudang Utama</option>
+            <!-- Dynamic Customer List -->
+          </select>
+        </div>
+      </div>
+
+      <!-- VISUAL MATRIX GRID -->
+      <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="text-sm font-bold text-slate-300">Visual Grid Posisi Palet (<span id="showing-count">0</span> Unit)</h3>
+          <div class="flex items-center gap-4 text-[10px] font-medium text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Gudang</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Customer</span>
+          </div>
+        </div>
+        <div id="pallet-grid" class="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2 max-h-[60vh] overflow-y-auto p-1">
+          <!-- Grid items inserted via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: RIWAYAT TRANSAKSI -->
+    <div id="tab-history" class="hidden space-y-4">
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-slate-200">Log Transaksi Masuk & Keluar</h3>
+          <span class="text-xs text-slate-400">Terbaru di atas</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider">
+              <tr>
+                <th class="p-3.5">Waktu Transaksi</th>
+                <th class="p-3.5">Jenis Transaksi</th>
+                <th class="p-3.5">Lokasi / Customer</th>
+                <th class="p-3.5">No. Surat Jalan / Job</th>
+                <th class="p-3.5">Palet Terlibat</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-800/60">
+              <tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat riwayat transaksi...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://hfgpbykeehickbajocbk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZ3BieWtlZWhpY2tiYWpvY2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjk5NzgsImV4cCI6MjEwNjgwNTk3OH0.ovaMvzuW-afaYsEogBhYwBrzyPz2ePAFf4fHTGbKhOs';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let allPallets = [];
+    let allTransactions = [];
+
+    window.onload = function() {
+      loadAllData();
+    };
+
+    async function loadAllData() {
+      await Promise.all([fetchPallets(), fetchCustomers(), fetchTransactions()]);
+      renderStats();
+      filterPallets();
+      renderHistory();
+    }
+
+    async function fetchPallets() {
+      let { data, error } = await db.from('master_pallet').select('*').order('pallet_id');
+      if (!error && data) allPallets = data;
+    }
+
+    async function fetchCustomers() {
+      let { data } = await db.from('master_customer').select('nama_customer').order('nama_customer');
+      let select = document.getElementById('filter-location');
+      select.innerHTML = '<option value="ALL">-- Semua Lokasi --</option><option value="GUDANG">Gudang Utama</option>';
+      if (data) {
+        data.forEach(c => select.innerHTML += `<option value="${c.nama_customer}">${c.nama_customer}</option>`);
+      }
+    }
+
+    async function fetchTransactions() {
+      let { data, error } = await db.from('header_transaksi')
+        .select('*, detail_transaksi(pallet_id)')
+        .order('created_at', { ascending: false });
+      if (!error && data) allTransactions = data;
+    }
+
+    function renderStats() {
+      let total = allPallets.length;
+      let gudang = allPallets.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG').length;
+      let customer = total - gudang;
+
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-gudang').innerText = gudang;
+      document.getElementById('stat-customer').innerText = customer;
+      document.getElementById('stat-transaksi').innerText = allTransactions.length;
+    }
+
+    function filterPallets() {
+      let searchQuery = document.getElementById('search-pallet').value.trim().toUpperCase();
+      let locationFilter = document.getElementById('filter-location').value;
+
+      let filtered = allPallets.filter(p => {
+        let matchSearch = p.pallet_id.toUpperCase().includes(searchQuery);
+        let status = (p.status_lokasi || 'GUDANG').toUpperCase();
+        let matchLocation = (locationFilter === 'ALL') || (status === locationFilter.toUpperCase());
+        return matchSearch && matchLocation;
+      });
+
+      document.getElementById('showing-count').innerText = filtered.length;
+
+      let grid = document.getElementById('pallet-grid');
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="col-span-full text-center py-8 text-slate-500 text-xs">Tidak ada data palet yang sesuai.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => {
+        let isGudang = !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG';
+        let bgClass = isGudang ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+        let badgeText = isGudang ? 'GUDANG' : p.status_lokasi;
+
+        return `
+          <div class="p-2.5 rounded-xl border ${bgClass} flex flex-col justify-between space-y-1 hover:scale-105 transition-transform">
+            <span class="font-bold text-xs font-mono text-white">${p.pallet_id}</span>
+            <span class="text-[9px] font-semibold truncate uppercase" title="${badgeText}">${badgeText}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderHistory() {
+      let tbody = document.getElementById('history-table-body');
+      if (allTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada riwayat transaksi.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = allTransactions.map(t => {
+        let dateStr = new Date(t.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+        let isOut = t.jenis_transaksi.toUpperCase().includes('OUT');
+        let badgeJenis = isOut 
+          ? '<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-OUT</span>'
+          : '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-IN</span>';
+
+        let palletsList = t.detail_transaksi ? t.detail_transaksi.map(d => d.pallet_id).join(', ') : '-';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition-colors">
+            <td class="p-3.5 text-slate-400 whitespace-nowrap">${dateStr}</td>
+            <td class="p-3.5">${badgeJenis}</td>
+            <td class="p-3.5 font-medium text-white">${t.lokasi_customer || 'Gudang Utama'}</td>
+            <td class="p-3.5 font-mono text-indigo-300">${t.job_no || '-'}</td>
+            <td class="p-3.5 font-mono text-slate-300 max-w-xs truncate" title="${palletsList}">${palletsList}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function switchTab(tab) {
+      let btnStatus = document.getElementById('tab-btn-status');
+      let btnHistory = document.getElementById('tab-btn-history');
+      let tabStatus = document.getElementById('tab-status');
+      let tabHistory = document.getElementById('tab-history');
+
+      if (tab === 'status') {
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabStatus.classList.remove('hidden');
+        tabHistory.classList.add('hidden');
+      } else {
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabHistory.classList.remove('hidden');
+        tabStatus.classList.add('hidden');
+      }
+    }
+
+    // EXPORT DATA TO EXCEL
+    function exportToExcel() {
+      let excelData = allPallets.map(p => ({
+        "ID Palet": p.pallet_id,
+        "Status Lokasi": p.status_lokasi || "GUDANG",
+        "Terakhir Diupdate": p.updated_at ? new Date(p.updated_at).toLocaleString('id-ID') : "-"
+      }));
+
+      let worksheet = XLSX.utils.json_to_sheet(excelData);
+      let workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Palet");
+
+      let dateNow = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Laporan_Stok_Palet_${dateNow}.xlsx`);
+    }
+  </script>
+</body>
+</html>
