@@ -3,461 +3,437 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal Pallet Tracking - Level 2 Supabase</title>
+  <title>Admin Dashboard - Pallet Control Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
   <!-- NAVBAR HEADER -->
-  <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
       <div class="flex items-center space-x-3">
-        <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-500/30">
-          <i class="fa-solid fa-bolt text-lg"></i>
+        <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid fa-chart-line text-lg"></i>
         </div>
         <div>
-          <h1 class="font-bold text-base md:text-lg leading-tight tracking-wide">PALLET TRACKING L2</h1>
-          <p class="text-xs text-blue-400 font-medium">Powered by Supabase Engine</p>
+          <h1 class="font-bold text-base md:text-xl tracking-wide">MONITORING PALLET ADMIN</h1>
+          <p class="text-xs text-indigo-400 font-medium">Enterprise Asset Management Portal</p>
         </div>
       </div>
-      <div class="flex items-center space-x-2 bg-emerald-500/10 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400 border border-emerald-500/20">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>Ultra-Fast DB</span>
+      <div class="flex items-center gap-3">
+        <button onclick="printFilteredQRs()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2">
+          <i class="fa-solid fa-qrcode text-sm"></i>
+          <span class="hidden sm:inline">Cetak Label QR</span>
+        </button>
+        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-sm"></i>
+          <span class="hidden sm:inline">Export Excel</span>
+        </button>
+        <button onclick="loadAllData()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-xl text-xs border border-slate-700 transition-all">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
       </div>
     </div>
   </header>
 
-  <!-- MAIN CONTAINER -->
-  <main class="max-w-4xl mx-auto w-full px-4 py-5 flex-1 space-y-4">
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
 
-    <!-- STATS CARDS -->
-    <div class="grid grid-cols-3 gap-3">
-      <div class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Palet</div>
-        <div class="text-xl md:text-2xl font-extrabold text-white" id="stat-total">-</div>
+    <!-- STATS CARDS OVERVIEW -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Unit Palet</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-white" id="stat-total">-</div>
       </div>
-
-      <div onclick="openGudangModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all">
-        <div class="flex justify-between items-center mb-1">
-          <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Gudang</span>
-          <i class="fa-solid fa-circle-info text-emerald-400/50 text-xs"></i>
-        </div>
-        <div class="text-xl md:text-2xl font-extrabold text-emerald-400" id="stat-gudang">-</div>
-        <p class="text-[9px] text-slate-400 mt-0.5">Klik rincian</p>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Di Gudang Utama</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-emerald-400" id="stat-gudang">-</div>
       </div>
-
-      <div onclick="openCustomerModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-blue-500/50 hover:bg-slate-800/80 cursor-pointer transition-all">
-        <div class="flex justify-between items-center mb-1">
-          <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Customer</span>
-          <i class="fa-solid fa-chart-pie text-blue-400/50 text-xs"></i>
-        </div>
-        <div class="text-xl md:text-2xl font-extrabold text-blue-400" id="stat-customer">-</div>
-        <p class="text-[9px] text-blue-300 mt-0.5 font-medium">Klik rincian &rarr;</p>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Tersebar di Customer</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-blue-400" id="stat-customer">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Total Transaksi</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-indigo-400" id="stat-transaksi">-</div>
       </div>
     </div>
 
-    <!-- MAIN FORM & SCANNER CARD -->
-    <div class="bg-slate-800 rounded-2xl border border-slate-700/80 shadow-xl overflow-hidden p-5 space-y-4">
-      
-      <!-- STEP 1: FORM TRANSAKSI -->
-      <div id="step-header" class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Transaksi</label>
-          <select id="jenisTransaksi" onchange="toggleCustomerSelect()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
-            <option value="GATE-OUT (PENGIRIMAN)">GATE-OUT (PENGIRIMAN KE CUSTOMER)</option>
-            <option value="GATE-IN (PENGEMBALIAN)">GATE-IN (PENGEMBALIAN KE GUDANG)</option>
-          </select>
-        </div>
-
-        <div id="container-customer">
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Lokasi Tujuan Customer</label>
-          <select id="lokasiCustomer" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
-            <option value="">-- Memuat Customer... --</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nomor Job / Surat Jalan</label>
-          <input type="text" id="jobNo" placeholder="Contoh: SJ-2026-001" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
-        </div>
-
-        <button onclick="goToScanStep()" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
-          <span>Buka Kamera Pemindai</span>
-          <i class="fa-solid fa-arrow-right"></i>
-        </button>
-      </div>
-
-      <!-- STEP 2: CAMERA & CONTINUOUS SCAN -->
-      <div id="step-scan" class="hidden space-y-4">
-        <button id="btn-start-cam" onclick="startCamera()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
-          <i class="fa-solid fa-camera"></i>
-          <span>Mulai Pemindaian</span>
-        </button>
-
-        <div id="reader" class="w-full rounded-2xl overflow-hidden border-2 border-dashed border-slate-600 hidden"></div>
-
-        <!-- COUNTER BAR -->
-        <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-700">
-          <div class="flex items-center gap-2">
-            <i class="fa-solid fa-barcode text-blue-400"></i>
-            <span class="text-sm font-semibold text-slate-300">Ter-scan:</span>
-            <span id="scan-count" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">0</span>
-          </div>
-          <button onclick="resetScannedList()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1">
-            <i class="fa-solid fa-rotate-left"></i> Reset
-          </button>
-        </div>
-
-        <!-- LIST PALET -->
-        <div id="pallet-list" class="max-h-48 overflow-y-auto border border-slate-700 p-2 rounded-xl bg-slate-900/50 space-y-1.5">
-          <div class="text-slate-500 text-center py-4 text-xs">Belum ada barcode di-scan</div>
-        </div>
-
-        <!-- SUBMIT -->
-        <button id="btn-submit" onclick="submitData()" class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2">
-          <i class="fa-solid fa-paper-plane"></i>
-          <span>Simpan Transaksi (Supabase)</span>
-        </button>
-
-        <button onclick="backToHeader()" class="w-full text-xs text-slate-400 hover:text-white font-medium py-2 transition-colors">
-          &larr; Kembali ke Form Header
-        </button>
-      </div>
-
+    <!-- TABS NAVIGATION -->
+    <div class="bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 flex gap-2 w-full md:w-fit">
+      <button id="tab-btn-status" onclick="switchTab('status')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md">
+        <i class="fa-solid fa-boxes-stacked mr-2"></i> Posisi Status Palet
+      </button>
+      <button id="tab-btn-history" onclick="switchTab('history')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-clock-rotate-left mr-2"></i> Riwayat Transaksi (Log)
+      </button>
     </div>
+
+    <!-- TAB 1: POSISI PALET & FILTER -->
+    <div id="tab-status" class="space-y-4">
+      <!-- FILTER BAR -->
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-3 justify-between items-center">
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+          <input type="text" id="search-pallet" onkeyup="filterPallets()" placeholder="Cari ID Palet (misal: C-012)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+        
+        <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <!-- FILTER TIPE PALLET -->
+          <select id="filter-type" onchange="filterPallets()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none">
+            <option value="ALL">-- Semua Tipe Palet --</option>
+          </select>
+
+          <!-- FILTER LOKASI -->
+          <select id="filter-location" onchange="filterPallets()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none">
+            <option value="ALL">-- Semua Lokasi --</option>
+            <option value="GUDANG">Gudang Utama</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- VISUAL GROUPED ACCORDION BY PALLET TYPE -->
+      <div class="space-y-4" id="accordion-pallet-container">
+        <!-- Grouped Type Accordions Inserted via JS -->
+      </div>
+    </div>
+
+    <!-- TAB 2: RIWAYAT TRANSAKSI -->
+    <div id="tab-history" class="hidden space-y-4">
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-slate-200">Log Transaksi Masuk & Keluar</h3>
+          <span class="text-xs text-slate-400">Terbaru di atas</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider">
+              <tr>
+                <th class="p-3.5">Waktu Transaksi</th>
+                <th class="p-3.5">Jenis Transaksi</th>
+                <th class="p-3.5">Lokasi / Customer</th>
+                <th class="p-3.5">No. Surat Jalan / Job</th>
+                <th class="p-3.5">Palet Terlibat</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-800/60">
+              <tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat riwayat transaksi...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
-
-  <!-- MODAL POPUP: BREAKDOWN PALET CUSTOMER -->
-  <div id="modal-customer" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/90 sticky top-0">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
-            <i class="fa-solid fa-building-user text-base"></i>
-          </div>
-          <div>
-            <h3 class="font-bold text-white text-sm">Sebaran Palet di Customer</h3>
-            <p class="text-xs text-slate-400">Total: <span id="modal-cust-total" class="text-blue-400 font-bold">0</span> Unit</p>
-          </div>
-        </div>
-        <button onclick="closeCustomerModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-      <div id="modal-cust-list" class="p-4 overflow-y-auto space-y-3 text-sm flex-1"></div>
-    </div>
-  </div>
-
-  <!-- MODAL POPUP: RINCIAN PALET GUDANG -->
-  <div id="modal-gudang" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/90 sticky top-0">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
-            <i class="fa-solid fa-warehouse text-base"></i>
-          </div>
-          <div>
-            <h3 class="font-bold text-white text-sm">Palet Standby di Gudang</h3>
-            <p class="text-xs text-slate-400">Total: <span id="modal-gudang-total" class="text-emerald-400 font-bold">0</span> Unit</p>
-          </div>
-        </div>
-        <button onclick="closeGudangModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-      <div id="modal-gudang-list" class="p-4 overflow-y-auto text-sm flex-1"></div>
-    </div>
-  </div>
-
-  <!-- TOAST NOTIFICATION -->
-  <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 text-white border border-slate-700 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50">
-    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
-    <span id="toast-msg" class="text-sm font-medium">Notifikasi</span>
-  </div>
 
   <script>
     const SUPABASE_URL = 'https://hfgpbykeehickbajocbk.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZ3BieWtlZWhpY2tiYWpvY2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjk5NzgsImV4cCI6MjEwNjgwNTk3OH0.ovaMvzuW-afaYsEogBhYwBrzyPz2ePAFf4fHTGbKhOs';
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let scannedPallets = [];
-    let html5QrcodeScanner = null;
-    let rawPalletData = [];
+    let allPallets = [];
+    let currentFilteredPallets = [];
+    let allTransactions = [];
 
-    window.onload = async function() {
-      await loadCustomers();
-      await refreshStats();
+    window.onload = function() {
+      loadAllData();
     };
 
-    async function loadCustomers() {
+    async function loadAllData() {
+      await Promise.all([fetchPallets(), fetchCustomers(), fetchTransactions()]);
+      renderStats();
+      populateTypeDropdown();
+      filterPallets();
+      renderHistory();
+    }
+
+    async function fetchPallets() {
+      let { data, error } = await db.from('master_pallet').select('*').order('pallet_id');
+      if (!error && data) {
+        allPallets = data.map(p => ({
+          ...p,
+          tipe_pallet: p.tipe_pallet || ('Tipe ' + p.pallet_id.split('-')[0])
+        }));
+      }
+    }
+
+    async function fetchCustomers() {
       let { data } = await db.from('master_customer').select('nama_customer').order('nama_customer');
-      let select = document.getElementById('lokasiCustomer');
-      select.innerHTML = '<option value="">-- Pilih Customer Target --</option>';
-      if (data && data.length > 0) {
-        data.forEach(c => select.innerHTML += `<option value="${c.nama_customer}">${c.nama_customer}</option>`);
-      } else {
-        const defaultList = ["ADM Plant 1", "ADM Plant 4", "ADM Plant 5", "TMMIN", "GAYA MOTOR", "HMMI", "HPM", "MKM"];
-        defaultList.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
-      }
-    }
-
-    async function refreshStats() {
-      let { data, error } = await db.from('master_pallet').select('pallet_id, status_lokasi, tipe_pallet').order('pallet_id');
+      let select = document.getElementById('filter-location');
+      select.innerHTML = '<option value="ALL">-- Semua Lokasi --</option><option value="GUDANG">Gudang Utama</option>';
       if (data) {
-        rawPalletData = data;
-        let total = data.length;
-        let gudang = data.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG').length;
-        let customer = total - gudang;
-
-        document.getElementById('stat-total').innerText = total;
-        document.getElementById('stat-gudang').innerText = gudang;
-        document.getElementById('stat-customer').innerText = customer;
+        data.forEach(c => select.innerHTML += `<option value="${c.nama_customer}">${c.nama_customer}</option>`);
       }
     }
 
-    function openCustomerModal() {
-      let custData = rawPalletData.filter(p => p.status_lokasi && p.status_lokasi.toUpperCase() !== 'GUDANG');
-      document.getElementById('modal-cust-total').innerText = custData.length;
+    async function fetchTransactions() {
+      let { data, error } = await db.from('header_transaksi')
+        .select('*, detail_transaksi(pallet_id)')
+        .order('created_at', { ascending: false });
+      if (!error && data) allTransactions = data;
+    }
 
-      let groups = {};
-      custData.forEach(p => {
-        let loc = p.status_lokasi;
-        if (!groups[loc]) groups[loc] = [];
-        groups[loc].push(p.pallet_id);
+    function populateTypeDropdown() {
+      let types = [...new Set(allPallets.map(p => p.tipe_pallet))].sort();
+      let select = document.getElementById('filter-type');
+      select.innerHTML = '<option value="ALL">-- Semua Tipe Palet --</option>';
+      types.forEach(t => select.innerHTML += `<option value="${t}">${t}</option>`);
+    }
+
+    function renderStats() {
+      let total = allPallets.length;
+      let gudang = allPallets.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG').length;
+      let customer = total - gudang;
+
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-gudang').innerText = gudang;
+      document.getElementById('stat-customer').innerText = customer;
+      document.getElementById('stat-transaksi').innerText = allTransactions.length;
+    }
+
+    function filterPallets() {
+      let searchQuery = document.getElementById('search-pallet').value.trim().toUpperCase();
+      let typeFilter = document.getElementById('filter-type').value;
+      let locationFilter = document.getElementById('filter-location').value;
+
+      currentFilteredPallets = allPallets.filter(p => {
+        let matchSearch = p.pallet_id.toUpperCase().includes(searchQuery);
+        let matchType = (typeFilter === 'ALL') || (p.tipe_pallet === typeFilter);
+        let status = (p.status_lokasi || 'GUDANG').toUpperCase();
+        let matchLocation = (locationFilter === 'ALL') || (status === locationFilter.toUpperCase());
+        return matchSearch && matchType && matchLocation;
       });
 
-      let container = document.getElementById('modal-cust-list');
-      if (Object.keys(groups).length === 0) {
-        container.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">Belum ada palet di customer. Seluruh palet ada di Gudang.</div>';
-      } else {
-        let html = '';
-        for (let cust in groups) {
-          html += `
-            <div class="bg-slate-900 border border-slate-700/80 p-3.5 rounded-xl space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="font-bold text-white text-sm flex items-center gap-2">
-                  <i class="fa-solid fa-location-dot text-blue-400"></i> ${cust}
-                </span>
-                <span class="bg-blue-500/20 text-blue-400 font-extrabold text-xs px-2.5 py-1 rounded-full border border-blue-500/30">
-                  ${groups[cust].length} Unit
-                </span>
+      renderAccordionGrid(currentFilteredPallets);
+    }
+
+    function renderAccordionGrid(pallets) {
+      let container = document.getElementById('accordion-pallet-container');
+      if (pallets.length === 0) {
+        container.innerHTML = '<div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-500 text-xs">Tidak ada data palet yang sesuai.</div>';
+        return;
+      }
+
+      // Grouping berdasarkan tipe_pallet
+      let groups = {};
+      pallets.forEach(p => {
+        let type = p.tipe_pallet || 'Tipe Lain';
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(p);
+      });
+
+      let html = '';
+      let index = 0;
+      for (let type in groups) {
+        let items = groups[type];
+        let gudangCount = items.filter(i => !i.status_lokasi || i.status_lokasi.toUpperCase() === 'GUDANG').length;
+        let custCount = items.length - gudangCount;
+        let accordionId = `acc-body-${index}`;
+        let arrowId = `acc-arrow-${index}`;
+
+        let gridCards = items.map(p => {
+          let isGudang = !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG';
+          let bgClass = isGudang ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+          let badgeText = isGudang ? 'GUDANG' : p.status_lokasi;
+
+          return `
+            <div class="p-2.5 rounded-xl border ${bgClass} flex flex-col justify-between space-y-2 relative group hover:scale-105 transition-transform">
+              <div class="flex justify-between items-start">
+                <span class="font-bold text-xs font-mono text-white">${p.pallet_id}</span>
+                <button onclick="printSingleQR('${p.pallet_id}')" title="Cetak QR Code" class="text-slate-400 hover:text-white p-1 rounded transition-colors">
+                  <i class="fa-solid fa-print text-xs"></i>
+                </button>
               </div>
-              <div class="text-xs text-slate-400 bg-slate-950/50 p-2.5 rounded-lg border border-slate-800 font-mono break-words leading-relaxed">
-                ${groups[cust].join(', ')}
-              </div>
+              <span class="text-[9px] font-semibold truncate uppercase" title="${badgeText}">${badgeText}</span>
             </div>
           `;
-        }
-        container.innerHTML = html;
-      }
-      document.getElementById('modal-customer').classList.remove('hidden');
-    }
+        }).join('');
 
-    function closeCustomerModal() {
-      document.getElementById('modal-customer').classList.add('hidden');
-    }
+        html += `
+          <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+            <!-- ACCORDION HEADER (KLIK UNTUK EXPAND/COLLAPSE) -->
+            <div onclick="toggleAccordion('${accordionId}', '${arrowId}')" class="p-4 bg-slate-900/90 hover:bg-slate-800/80 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-800/60">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                  <i class="fa-solid fa-layer-group text-sm"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    ${type}
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                      ${items.length} Unit
+                    </span>
+                  </h3>
+                  <p class="text-[10px] text-slate-400 mt-0.5">
+                    Gudang: <span class="text-emerald-400 font-bold">${gudangCount}</span> | 
+                    Customer: <span class="text-blue-400 font-bold">${custCount}</span>
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-2 text-slate-400">
+                <span class="text-xs text-slate-500 font-medium hidden sm:inline">Lihat Item</span>
+                <i id="${arrowId}" class="fa-solid fa-chevron-down text-sm transition-transform duration-300"></i>
+              </div>
+            </div>
 
-    function openGudangModal() {
-      let gudangData = rawPalletData.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG');
-      document.getElementById('modal-gudang-total').innerText = gudangData.length;
-
-      let container = document.getElementById('modal-gudang-list');
-      if (gudangData.length === 0) {
-        container.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">Tidak ada palet di Gudang.</div>';
-      } else {
-        container.innerHTML = `
-          <div class="bg-slate-900 border border-slate-700/80 p-4 rounded-xl space-y-2">
-            <div class="text-xs font-semibold text-slate-400">Daftar ID Palet Ready di Gudang:</div>
-            <div class="text-xs text-emerald-400 bg-slate-950/50 p-3 rounded-lg border border-slate-800 font-mono break-words leading-relaxed max-h-60 overflow-y-auto">
-              ${gudangData.map(p => p.pallet_id).join(', ')}
+            <!-- ACCORDION BODY GRID -->
+            <div id="${accordionId}" class="p-4 bg-slate-950/40">
+              <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+                ${gridCards}
+              </div>
             </div>
           </div>
         `;
+        index++;
       }
-      document.getElementById('modal-gudang').classList.remove('hidden');
+
+      container.innerHTML = html;
     }
 
-    function closeGudangModal() {
-      document.getElementById('modal-gudang').classList.add('hidden');
-    }
-
-    function showToast(message, isError = false) {
-      let toast = document.getElementById('toast');
-      let icon = document.getElementById('toast-icon');
-      let msg = document.getElementById('toast-msg');
-
-      msg.innerText = message;
-      icon.className = isError ? "fa-solid fa-circle-xmark text-rose-400 text-lg" : "fa-solid fa-circle-check text-emerald-400 text-lg";
-
-      toast.classList.remove('translate-y-20', 'opacity-0');
-      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3500);
-    }
-
-    function toggleCustomerSelect() {
-      let jenis = document.getElementById('jenisTransaksi').value;
-      let container = document.getElementById('container-customer');
-      if (jenis.includes("IN")) {
-        container.classList.add('opacity-30', 'pointer-events-none');
+    function toggleAccordion(bodyId, arrowId) {
+      let body = document.getElementById(bodyId);
+      let arrow = document.getElementById(arrowId);
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        arrow.style.transform = 'rotate(0deg)';
       } else {
-        container.classList.remove('opacity-30', 'pointer-events-none');
+        body.classList.add('hidden');
+        arrow.style.transform = 'rotate(-90deg)';
       }
     }
 
-    function playBeep(isError = false) {
-      let ctx = new (window.AudioContext || window.webkitAudioContext)();
-      let osc = ctx.createOscillator();
-      osc.connect(ctx.destination);
-      osc.frequency.value = isError ? 300 : 800;
-      osc.start();
-      osc.stop(ctx.currentTime + (isError ? 0.35 : 0.1));
-    }
-
-    function goToScanStep() {
-      let jenis = document.getElementById('jenisTransaksi').value;
-      let cust = document.getElementById('lokasiCustomer').value;
-      if (!cust && jenis.includes("OUT")) {
-        showToast("Silakan pilih Lokasi Customer!", true);
+    function renderHistory() {
+      let tbody = document.getElementById('history-table-body');
+      if (allTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada riwayat transaksi.</td></tr>';
         return;
       }
-      document.getElementById('step-header').classList.add('hidden');
-      document.getElementById('step-scan').classList.remove('hidden');
+
+      tbody.innerHTML = allTransactions.map(t => {
+        let dateStr = new Date(t.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+        let isOut = t.jenis_transaksi.toUpperCase().includes('OUT');
+        let badgeJenis = isOut 
+          ? '<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-OUT</span>'
+          : '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-IN</span>';
+
+        let palletsList = t.detail_transaksi ? t.detail_transaksi.map(d => d.pallet_id).join(', ') : '-';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition-colors">
+            <td class="p-3.5 text-slate-400 whitespace-nowrap">${dateStr}</td>
+            <td class="p-3.5">${badgeJenis}</td>
+            <td class="p-3.5 font-medium text-white">${t.lokasi_customer || 'Gudang Utama'}</td>
+            <td class="p-3.5 font-mono text-indigo-300">${t.job_no || '-'}</td>
+            <td class="p-3.5 font-mono text-slate-300 max-w-xs truncate" title="${palletsList}">${palletsList}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
-    function backToHeader() {
-      stopCamera();
-      document.getElementById('step-scan').classList.add('hidden');
-      document.getElementById('step-header').classList.remove('hidden');
-    }
+    function switchTab(tab) {
+      let btnStatus = document.getElementById('tab-btn-status');
+      let btnHistory = document.getElementById('tab-btn-history');
+      let tabStatus = document.getElementById('tab-status');
+      let tabHistory = document.getElementById('tab-history');
 
-    function stopCamera() {
-      if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop().then(() => html5QrcodeScanner.clear()).catch(() => {});
-      }
-      document.getElementById('reader').classList.add('hidden');
-      document.getElementById('btn-start-cam').classList.remove('hidden');
-    }
-
-    function startCamera() {
-      document.getElementById('btn-start-cam').classList.add('hidden');
-      document.getElementById('reader').classList.remove('hidden');
-
-      html5QrcodeScanner = new Html5Qrcode("reader");
-      const config = { fps: 15, qrbox: { width: 230, height: 230 } };
-
-      html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
-        .catch(() => {
-          Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length) {
-              html5QrcodeScanner.start(devices[devices.length - 1].id, config, onScanSuccess);
-            }
-          }).catch(() => showToast("Gagal mengakses kamera HP!", true));
-        });
-    }
-
-    // VALIDASI KETAT GATE-OUT VS GATE-IN
-    async function onScanSuccess(decodedText) {
-      let code = decodedText.trim();
-      if (scannedPallets.includes(code)) return; // Abaikan jika sudah di-scan saat ini
-
-      let jenis = document.getElementById('jenisTransaksi').value;
-      let isGateOut = jenis.includes("OUT");
-
-      // Periksa status lokasi palet dari Supabase
-      let { data: pData } = await db.from('master_pallet').select('status_lokasi').eq('pallet_id', code).single();
-
-      if (isGateOut) {
-        // JIKA SCAN OUT: Palet WAJIB sedang berada di GUDANG
-        if (pData && pData.status_lokasi && pData.status_lokasi.toUpperCase() !== 'GUDANG') {
-          playBeep(true);
-          showToast(`Gagal! Palet ${code} masih di ${pData.status_lokasi}. Wajib GATE-IN ke Gudang dulu!`, true);
-          return;
-        }
+      if (tab === 'status') {
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabStatus.classList.remove('hidden');
+        tabHistory.classList.add('hidden');
       } else {
-        // JIKA SCAN IN: Peringatan jika palet memang sudah di Gudang
-        if (pData && (!pData.status_lokasi || pData.status_lokasi.toUpperCase() === 'GUDANG')) {
-          showToast(`Peringatan: Palet ${code} memang sudah berada di Gudang!`);
-        }
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabHistory.classList.remove('hidden');
+        tabStatus.classList.add('hidden');
       }
-
-      scannedPallets.unshift(code);
-      playBeep(false);
-      showToast("Palet " + code + " berhasil di-scan");
-      updateUI();
     }
 
-    function updateUI() {
-      document.getElementById('scan-count').innerText = scannedPallets.length;
-      if (scannedPallets.length === 0) {
-        document.getElementById('pallet-list').innerHTML = '<div class="text-slate-500 text-center py-4 text-xs">Belum ada barcode di-scan</div>';
+    function exportToExcel() {
+      let excelData = allPallets.map(p => ({
+        "ID Palet": p.pallet_id,
+        "Tipe Palet": p.tipe_pallet || "-",
+        "Status Lokasi": p.status_lokasi || "GUDANG",
+        "Terakhir Diupdate": p.updated_at ? new Date(p.updated_at).toLocaleString('id-ID') : "-"
+      }));
+
+      let worksheet = XLSX.utils.json_to_sheet(excelData);
+      let workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Palet");
+
+      let dateNow = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Laporan_Stok_Palet_${dateNow}.xlsx`);
+    }
+
+    function printSingleQR(palletId) {
+      generatePrintWindow([{ pallet_id: palletId }]);
+    }
+
+    function printFilteredQRs() {
+      if (currentFilteredPallets.length === 0) {
+        alert("Tidak ada palet yang dapat dicetak!");
         return;
       }
-      document.getElementById('pallet-list').innerHTML = scannedPallets.map(p => `
-        <div class="p-2.5 bg-slate-900 border border-slate-700 rounded-xl flex justify-between items-center font-mono text-xs">
-          <span class="font-bold text-slate-100">${p}</span>
-          <span class="text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">READY</span>
+      generatePrintWindow(currentFilteredPallets);
+    }
+
+    function generatePrintWindow(palletList) {
+      let win = window.open('', '_blank');
+      let labelCardsHtml = palletList.map(p => `
+        <div style="
+          border: 2px solid #000;
+          border-radius: 8px;
+          padding: 10px;
+          text-align: center;
+          width: 150px;
+          box-sizing: border-box;
+          page-break-inside: avoid;
+          display: inline-block;
+          margin: 6px;
+          font-family: Arial, sans-serif;
+        ">
+          <div style="font-size: 10px; font-weight: bold; color: #555; margin-bottom: 4px;">PROPERTY OF COMPANY</div>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${p.pallet_id}" style="width: 110px; height: 110px; display: block; margin: 0 auto;">
+          <div style="font-size: 16px; font-weight: bold; font-family: monospace; margin-top: 6px;">${p.pallet_id}</div>
         </div>
       `).join('');
-    }
 
-    function resetScannedList() {
-      scannedPallets = [];
-      updateUI();
-      showToast("Daftar scan dibersihkan");
-    }
-
-    async function submitData() {
-      if (scannedPallets.length === 0) {
-        showToast("Belum ada palet yang di-scan!", true);
-        return;
-      }
-
-      let btn = document.getElementById('btn-submit');
-      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Menyimpan ke Supabase...</span>';
-      btn.disabled = true;
-
-      let jenis = document.getElementById('jenisTransaksi').value;
-      let cust = document.getElementById('lokasiCustomer').value;
-      let jobNo = document.getElementById('jobNo').value;
-      let statusBaru = jenis.includes("OUT") ? (cust || "GUDANG") : "GUDANG";
-
-      try {
-        let { data: header, error: errHeader } = await db
-          .from('header_transaksi')
-          .insert([{ jenis_transaksi: jenis, lokasi_customer: cust, job_no: jobNo }])
-          .select()
-          .single();
-
-        if (errHeader) throw errHeader;
-
-        let detailRows = scannedPallets.map(p => ({ header_id: header.id, pallet_id: p }));
-        let masterRows = scannedPallets.map(p => ({ 
-          pallet_id: p, 
-          status_lokasi: statusBaru, 
-          tipe_pallet: 'Tipe ' + p.split('-')[0],
-          updated_at: new Date() 
-        }));
-
-        let { error: errMaster } = await db.from('master_pallet').upsert(masterRows, { onConflict: 'pallet_id' });
-        if (errMaster) throw errMaster;
-
-        let { error: errDetail } = await db.from('detail_transaksi').insert(detailRows);
-        if (errDetail) throw errDetail;
-
-        showToast("Berhasil menyimpan " + scannedPallets.length + " palet!");
-        setTimeout(() => location.reload(), 1200);
-
-      } catch (err) {
-        showToast("Gagal menyimpan: " + err.message, true);
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i><span>Simpan Transaksi (Supabase)</span>';
-        btn.disabled = false;
-      }
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Cetak Label QR Palet</title>
+          <style>
+            body { margin: 15px; background: #fff; }
+            @media print {
+              body { margin: 0; }
+              @page { size: auto; margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+            ${labelCardsHtml}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
     }
   </script>
 </body>
