@@ -37,32 +37,29 @@
   <!-- MAIN CONTAINER -->
   <main class="max-w-4xl mx-auto w-full px-4 py-5 flex-1 space-y-4">
 
-    <!-- STATS CARDS (INTERAKTIF) -->
+    <!-- STATS CARDS -->
     <div class="grid grid-cols-3 gap-3">
-      <!-- Card Total -->
       <div class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg">
         <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Palet</div>
         <div class="text-xl md:text-2xl font-extrabold text-white" id="stat-total">-</div>
       </div>
 
-      <!-- Card Gudang (Klik untuk rincian) -->
-      <div onclick="openGudangModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all group relative overflow-hidden">
+      <div onclick="openGudangModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all">
         <div class="flex justify-between items-center mb-1">
           <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Gudang</span>
-          <i class="fa-solid fa-circle-info text-emerald-400/50 group-hover:text-emerald-400 text-xs transition-colors"></i>
+          <i class="fa-solid fa-circle-info text-emerald-400/50 text-xs"></i>
         </div>
         <div class="text-xl md:text-2xl font-extrabold text-emerald-400" id="stat-gudang">-</div>
-        <p class="text-[9px] text-slate-400 mt-0.5">Klik untuk lihat item</p>
+        <p class="text-[9px] text-slate-400 mt-0.5">Klik rincian</p>
       </div>
 
-      <!-- Card Customer (Klik untuk rincian breakdown) -->
-      <div onclick="openCustomerModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-blue-500/50 hover:bg-slate-800/80 cursor-pointer transition-all group relative overflow-hidden">
+      <div onclick="openCustomerModal()" class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700/80 shadow-lg hover:border-blue-500/50 hover:bg-slate-800/80 cursor-pointer transition-all">
         <div class="flex justify-between items-center mb-1">
           <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Customer</span>
-          <i class="fa-solid fa-chart-pie text-blue-400/50 group-hover:text-blue-400 text-xs transition-colors"></i>
+          <i class="fa-solid fa-chart-pie text-blue-400/50 text-xs"></i>
         </div>
         <div class="text-xl md:text-2xl font-extrabold text-blue-400" id="stat-customer">-</div>
-        <p class="text-[9px] text-blue-300 mt-0.5 font-medium">Klik rincian lokasi &rarr;</p>
+        <p class="text-[9px] text-blue-300 mt-0.5 font-medium">Klik rincian &rarr;</p>
       </div>
     </div>
 
@@ -74,8 +71,8 @@
         <div>
           <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Jenis Transaksi</label>
           <select id="jenisTransaksi" onchange="toggleCustomerSelect()" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-medium focus:outline-none focus:border-blue-500 transition-all">
-            <option value="GATE-OUT (PENGIRIMAN)">GATE-OUT (PENGIRIMAN)</option>
-            <option value="GATE-IN (PENGEMBALIAN)">GATE-IN (PENGEMBALIAN)</option>
+            <option value="GATE-OUT (PENGIRIMAN)">GATE-OUT (PENGIRIMAN KE CUSTOMER)</option>
+            <option value="GATE-IN (PENGEMBALIAN)">GATE-IN (PENGEMBALIAN KE GUDANG)</option>
           </select>
         </div>
 
@@ -154,10 +151,7 @@
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
-
-      <div id="modal-cust-list" class="p-4 overflow-y-auto space-y-3 text-sm flex-1">
-        <!-- Content Customer Rincian dimasukkan via JS -->
-      </div>
+      <div id="modal-cust-list" class="p-4 overflow-y-auto space-y-3 text-sm flex-1"></div>
     </div>
   </div>
 
@@ -178,10 +172,7 @@
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
-
-      <div id="modal-gudang-list" class="p-4 overflow-y-auto text-sm flex-1">
-        <!-- Content Gudang dimasukkan via JS -->
-      </div>
+      <div id="modal-gudang-list" class="p-4 overflow-y-auto text-sm flex-1"></div>
     </div>
   </div>
 
@@ -218,13 +209,7 @@
     }
 
     async function refreshStats() {
-      let { data, error } = await db.from('master_pallet').select('pallet_id, status_lokasi').order('pallet_id');
-      if (error) {
-        console.error("Error fetching data:", error);
-        showToast("Gagal membaca data Supabase", true);
-        return;
-      }
-
+      let { data, error } = await db.from('master_pallet').select('pallet_id, status_lokasi, tipe_pallet').order('pallet_id');
       if (data) {
         rawPalletData = data;
         let total = data.length;
@@ -237,12 +222,10 @@
       }
     }
 
-    // BREAKDOWN MODAL CUSTOMER
     function openCustomerModal() {
       let custData = rawPalletData.filter(p => p.status_lokasi && p.status_lokasi.toUpperCase() !== 'GUDANG');
       document.getElementById('modal-cust-total').innerText = custData.length;
 
-      // Grouping by Customer Name
       let groups = {};
       custData.forEach(p => {
         let loc = p.status_lokasi;
@@ -256,7 +239,6 @@
       } else {
         let html = '';
         for (let cust in groups) {
-          let listIds = groups[cust].join(', ');
           html += `
             <div class="bg-slate-900 border border-slate-700/80 p-3.5 rounded-xl space-y-2">
               <div class="flex justify-between items-center">
@@ -268,14 +250,13 @@
                 </span>
               </div>
               <div class="text-xs text-slate-400 bg-slate-950/50 p-2.5 rounded-lg border border-slate-800 font-mono break-words leading-relaxed">
-                ${listIds}
+                ${groups[cust].join(', ')}
               </div>
             </div>
           `;
         }
         container.innerHTML = html;
       }
-
       document.getElementById('modal-customer').classList.remove('hidden');
     }
 
@@ -283,7 +264,6 @@
       document.getElementById('modal-customer').classList.add('hidden');
     }
 
-    // RINCIAN MODAL GUDANG
     function openGudangModal() {
       let gudangData = rawPalletData.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG');
       document.getElementById('modal-gudang-total').innerText = gudangData.length;
@@ -292,17 +272,15 @@
       if (gudangData.length === 0) {
         container.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">Tidak ada palet di Gudang.</div>';
       } else {
-        let listIds = gudangData.map(p => p.pallet_id).join(', ');
         container.innerHTML = `
           <div class="bg-slate-900 border border-slate-700/80 p-4 rounded-xl space-y-2">
             <div class="text-xs font-semibold text-slate-400">Daftar ID Palet Ready di Gudang:</div>
             <div class="text-xs text-emerald-400 bg-slate-950/50 p-3 rounded-lg border border-slate-800 font-mono break-words leading-relaxed max-h-60 overflow-y-auto">
-              ${listIds}
+              ${gudangData.map(p => p.pallet_id).join(', ')}
             </div>
           </div>
         `;
       }
-
       document.getElementById('modal-gudang').classList.remove('hidden');
     }
 
@@ -319,7 +297,7 @@
       icon.className = isError ? "fa-solid fa-circle-xmark text-rose-400 text-lg" : "fa-solid fa-circle-check text-emerald-400 text-lg";
 
       toast.classList.remove('translate-y-20', 'opacity-0');
-      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+      setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3500);
     }
 
     function toggleCustomerSelect() {
@@ -338,7 +316,7 @@
       osc.connect(ctx.destination);
       osc.frequency.value = isError ? 300 : 800;
       osc.start();
-      osc.stop(ctx.currentTime + (isError ? 0.3 : 0.1));
+      osc.stop(ctx.currentTime + (isError ? 0.35 : 0.1));
     }
 
     function goToScanStep() {
@@ -383,17 +361,35 @@
         });
     }
 
-    function onScanSuccess(decodedText) {
+    // VALIDASI KETAT GATE-OUT VS GATE-IN
+    async function onScanSuccess(decodedText) {
       let code = decodedText.trim();
-      if (!scannedPallets.includes(code)) {
-        scannedPallets.unshift(code);
-        playBeep(false);
-        showToast("Palet " + code + " berhasil di-scan");
-        updateUI();
+      if (scannedPallets.includes(code)) return; // Abaikan jika sudah di-scan saat ini
+
+      let jenis = document.getElementById('jenisTransaksi').value;
+      let isGateOut = jenis.includes("OUT");
+
+      // Periksa status lokasi palet dari Supabase
+      let { data: pData } = await db.from('master_pallet').select('status_lokasi').eq('pallet_id', code).single();
+
+      if (isGateOut) {
+        // JIKA SCAN OUT: Palet WAJIB sedang berada di GUDANG
+        if (pData && pData.status_lokasi && pData.status_lokasi.toUpperCase() !== 'GUDANG') {
+          playBeep(true);
+          showToast(`Gagal! Palet ${code} masih di ${pData.status_lokasi}. Wajib GATE-IN ke Gudang dulu!`, true);
+          return;
+        }
       } else {
-        playBeep(true);
-        showToast("Palet " + code + " sudah ada di daftar!", true);
+        // JIKA SCAN IN: Peringatan jika palet memang sudah di Gudang
+        if (pData && (!pData.status_lokasi || pData.status_lokasi.toUpperCase() === 'GUDANG')) {
+          showToast(`Peringatan: Palet ${code} memang sudah berada di Gudang!`);
+        }
       }
+
+      scannedPallets.unshift(code);
+      playBeep(false);
+      showToast("Palet " + code + " berhasil di-scan");
+      updateUI();
     }
 
     function updateUI() {
@@ -441,7 +437,12 @@
         if (errHeader) throw errHeader;
 
         let detailRows = scannedPallets.map(p => ({ header_id: header.id, pallet_id: p }));
-        let masterRows = scannedPallets.map(p => ({ pallet_id: p, status_lokasi: statusBaru, updated_at: new Date() }));
+        let masterRows = scannedPallets.map(p => ({ 
+          pallet_id: p, 
+          status_lokasi: statusBaru, 
+          tipe_pallet: 'Tipe ' + p.split('-')[0],
+          updated_at: new Date() 
+        }));
 
         let { error: errMaster } = await db.from('master_pallet').upsert(masterRows, { onConflict: 'pallet_id' });
         if (errMaster) throw errMaster;
