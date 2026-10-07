@@ -191,6 +191,11 @@
     let html5QrcodeScanner = null;
     let rawPalletData = [];
 
+    // KUNCI PENCEGAH RACE CONDITION
+    let isProcessingScan = false;
+    let lastScannedCode = '';
+    let lastScannedTime = 0;
+
     window.onload = async function() {
       await loadCustomers();
       await refreshStats();
@@ -361,35 +366,53 @@
         });
     }
 
-    // VALIDASI KETAT GATE-OUT VS GATE-IN
+    // PEMINDAIAN DENGAN PENGUNCIAN INSTAN (ANTI DUPLIKAT)
     async function onScanSuccess(decodedText) {
       let code = decodedText.trim();
-      if (scannedPallets.includes(code)) return; // Abaikan jika sudah di-scan saat ini
+      let now = Date.now();
 
-      let jenis = document.getElementById('jenisTransaksi').value;
-      let isGateOut = jenis.includes("OUT");
+      // 1. PENGECEKAN KUNCI SINKRON (SANGAT CEPAT)
+      if (isProcessingScan) return;
+      if (scannedPallets.includes(code)) return;
+      if (code === lastScannedCode && (now - lastScannedTime) < 2500) return;
 
-      // Periksa status lokasi palet dari Supabase
-      let { data: pData } = await db.from('master_pallet').select('status_lokasi').eq('pallet_id', code).single();
+      // PASANG KUNCI SECARA INSTAN
+      isProcessingScan = true;
+      lastScannedCode = code;
+      lastScannedTime = now;
 
-      if (isGateOut) {
-        // JIKA SCAN OUT: Palet WAJIB sedang berada di GUDANG
-        if (pData && pData.status_lokasi && pData.status_lokasi.toUpperCase() !== 'GUDANG') {
-          playBeep(true);
-          showToast(`Gagal! Palet ${code} masih di ${pData.status_lokasi}. Wajib GATE-IN ke Gudang dulu!`, true);
-          return;
+      try {
+        let jenis = document.getElementById('jenisTransaksi').value;
+        let isGateOut = jenis.includes("OUT");
+
+        // Periksa status lokasi palet dari Supabase
+        let { data: pData } = await db.from('master_pallet').select('status_lokasi').eq('pallet_id', code).single();
+
+        if (isGateOut) {
+          if (pData && pData.status_lokasi && pData.status_lokasi.toUpperCase() !== 'GUDANG') {
+            playBeep(true);
+            showToast(`Gagal! Palet ${code} masih di ${pData.status_lokasi}. Wajib GATE-IN ke Gudang dulu!`, true);
+            return;
+          }
+        } else {
+          if (pData && (!pData.status_lokasi || pData.status_lokasi.toUpperCase() === 'GUDANG')) {
+            showToast(`Peringatan: Palet ${code} memang sudah berada di Gudang!`);
+          }
         }
-      } else {
-        // JIKA SCAN IN: Peringatan jika palet memang sudah di Gudang
-        if (pData && (!pData.status_lokasi || pData.status_lokasi.toUpperCase() === 'GUDANG')) {
-          showToast(`Peringatan: Palet ${code} memang sudah berada di Gudang!`);
+
+        // Masukkan ke array jika lolos validasi
+        if (!scannedPallets.includes(code)) {
+          scannedPallets.unshift(code);
+          playBeep(false);
+          showToast("Palet " + code + " berhasil di-scan");
+          updateUI();
         }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        // BUKA KUNCI
+        isProcessingScan = false;
       }
-
-      scannedPallets.unshift(code);
-      playBeep(false);
-      showToast("Palet " + code + " berhasil di-scan");
-      updateUI();
     }
 
     function updateUI() {
@@ -440,7 +463,7 @@
         let masterRows = scannedPallets.map(p => ({ 
           pallet_id: p, 
           status_lokasi: statusBaru, 
-          tipe_pallet: 'Tipe ' + p.split('-')[0],
+          tipe_pallet: p.split('-')[0],
           updated_at: new Date() 
         }));
 
