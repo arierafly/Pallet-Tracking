@@ -1,48 +1,440 @@
-let lastScannedCode = '';
-let lastScannedTime = 0;
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Pallet Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
-// VALIDASI KETAT GATE-OUT VS GATE-IN & ANTI DOUBLE-SCAN
-async function onScanSuccess(decodedText) {
-  let code = decodedText.trim();
-  let now = Date.now();
+  <!-- NAVBAR HEADER -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/30">
+          <i class="fa-solid fa-chart-line text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base md:text-xl tracking-wide">MONITORING PALLET ADMIN</h1>
+          <p class="text-xs text-indigo-400 font-medium">Enterprise Asset Management Portal</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="printFilteredQRs()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2">
+          <i class="fa-solid fa-qrcode text-sm"></i>
+          <span class="hidden sm:inline">Cetak Label QR</span>
+        </button>
+        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-sm"></i>
+          <span class="hidden sm:inline">Export Excel</span>
+        </button>
+        <button onclick="loadAllData()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-xl text-xs border border-slate-700 transition-all">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+  </header>
 
-  // 1. FILTER COOLDOWN: Abaikan diam-diam jika QR yang sama ter-scan ulang dalam jeda < 2 detik
-  if (code === lastScannedCode && (now - lastScannedTime) < 2000) {
-    return;
-  }
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
 
-  // Update pencatatan scan terakhir
-  lastScannedCode = code;
-  lastScannedTime = now;
+    <!-- STATS CARDS OVERVIEW -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Unit Palet</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-white" id="stat-total">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Di Gudang Utama</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-emerald-400" id="stat-gudang">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Tersebar di Customer</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-blue-400" id="stat-customer">-</div>
+      </div>
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Total Transaksi</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-indigo-400" id="stat-transaksi">-</div>
+      </div>
+    </div>
 
-  // 2. ABAIKAN DIAM-DIAM jika kode sudah ada di daftar scan saat ini
-  if (scannedPallets.includes(code)) {
-    return;
-  }
+    <!-- TABS NAVIGATION -->
+    <div class="bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 flex gap-2 w-full md:w-fit">
+      <button id="tab-btn-status" onclick="switchTab('status')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md">
+        <i class="fa-solid fa-boxes-stacked mr-2"></i> Posisi Status Palet
+      </button>
+      <button id="tab-btn-history" onclick="switchTab('history')" class="flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white">
+        <i class="fa-solid fa-clock-rotate-left mr-2"></i> Riwayat Transaksi (Log)
+      </button>
+    </div>
 
-  let jenis = document.getElementById('jenisTransaksi').value;
-  let isGateOut = jenis.includes("OUT");
+    <!-- TAB 1: POSISI PALET & FILTER -->
+    <div id="tab-status" class="space-y-4">
+      <!-- FILTER BAR -->
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-3 justify-between items-center">
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+          <input type="text" id="search-pallet" onkeyup="filterPallets()" placeholder="Cari ID Palet (misal: C-012)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+        
+        <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          <!-- FILTER TIPE PALLET -->
+          <select id="filter-type" onchange="filterPallets()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none">
+            <option value="ALL">-- Semua Tipe Palet --</option>
+          </select>
 
-  // 3. Periksa status lokasi palet dari Supabase
-  let { data: pData } = await db.from('master_pallet').select('status_lokasi').eq('pallet_id', code).single();
+          <!-- FILTER LOKASI -->
+          <select id="filter-location" onchange="filterPallets()" class="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none">
+            <option value="ALL">-- Semua Lokasi --</option>
+            <option value="GUDANG">Gudang Utama</option>
+          </select>
+        </div>
+      </div>
 
-  if (isGateOut) {
-    // JIKA SCAN OUT: Palet WAJIB sedang berada di GUDANG
-    if (pData && pData.status_lokasi && pData.status_lokasi.toUpperCase() !== 'GUDANG') {
-      playBeep(true);
-      showToast(`Gagal! Palet ${code} masih di ${pData.status_lokasi}. Wajib GATE-IN ke Gudang dulu!`, true);
-      return;
+      <!-- VISUAL GROUPED ACCORDION BY PALLET TYPE -->
+      <div class="space-y-4" id="accordion-pallet-container">
+        <!-- Grouped Type Accordions Inserted via JS -->
+      </div>
+    </div>
+
+    <!-- TAB 2: RIWAYAT TRANSAKSI -->
+    <div id="tab-history" class="hidden space-y-4">
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-slate-200">Log Transaksi Masuk & Keluar</h3>
+          <span class="text-xs text-slate-400">Terbaru di atas</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider">
+              <tr>
+                <th class="p-3.5">Waktu Transaksi</th>
+                <th class="p-3.5">Jenis Transaksi</th>
+                <th class="p-3.5">Lokasi / Customer</th>
+                <th class="p-3.5">No. Surat Jalan / Job</th>
+                <th class="p-3.5">Palet Terlibat</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-800/60">
+              <tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat riwayat transaksi...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://hfgpbykeehickbajocbk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZ3BieWtlZWhpY2tiYWpvY2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMjk5NzgsImV4cCI6MjEwNjgwNTk3OH0.ovaMvzuW-afaYsEogBhYwBrzyPz2ePAFf4fHTGbKhOs';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let allPallets = [];
+    let currentFilteredPallets = [];
+    let allTransactions = [];
+
+    window.onload = function() {
+      loadAllData();
+    };
+
+    async function loadAllData() {
+      await Promise.all([fetchPallets(), fetchCustomers(), fetchTransactions()]);
+      renderStats();
+      populateTypeDropdown();
+      filterPallets();
+      renderHistory();
     }
-  } else {
-    // JIKA SCAN IN: Peringatan jika palet memang sudah di Gudang
-    if (pData && (!pData.status_lokasi || pData.status_lokasi.toUpperCase() === 'GUDANG')) {
-      showToast(`Peringatan: Palet ${code} memang sudah berada di Gudang!`);
-    }
-  }
 
-  // Masukkan ke daftar scan jika lolos validasi
-  scannedPallets.unshift(code);
-  playBeep(false);
-  showToast("Palet " + code + " berhasil di-scan");
-  updateUI();
-}
+    async function fetchPallets() {
+      let { data, error } = await db.from('master_pallet').select('*').order('pallet_id');
+      if (!error && data) {
+        allPallets = data.map(p => ({
+          ...p,
+          tipe_pallet: p.tipe_pallet || ('Tipe ' + p.pallet_id.split('-')[0])
+        }));
+      }
+    }
+
+    async function fetchCustomers() {
+      let { data } = await db.from('master_customer').select('nama_customer').order('nama_customer');
+      let select = document.getElementById('filter-location');
+      select.innerHTML = '<option value="ALL">-- Semua Lokasi --</option><option value="GUDANG">Gudang Utama</option>';
+      if (data) {
+        data.forEach(c => select.innerHTML += `<option value="${c.nama_customer}">${c.nama_customer}</option>`);
+      }
+    }
+
+    async function fetchTransactions() {
+      let { data, error } = await db.from('header_transaksi')
+        .select('*, detail_transaksi(pallet_id)')
+        .order('created_at', { ascending: false });
+      if (!error && data) allTransactions = data;
+    }
+
+    function populateTypeDropdown() {
+      let types = [...new Set(allPallets.map(p => p.tipe_pallet))].sort();
+      let select = document.getElementById('filter-type');
+      select.innerHTML = '<option value="ALL">-- Semua Tipe Palet --</option>';
+      types.forEach(t => select.innerHTML += `<option value="${t}">${t}</option>`);
+    }
+
+    function renderStats() {
+      let total = allPallets.length;
+      let gudang = allPallets.filter(p => !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG').length;
+      let customer = total - gudang;
+
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-gudang').innerText = gudang;
+      document.getElementById('stat-customer').innerText = customer;
+      document.getElementById('stat-transaksi').innerText = allTransactions.length;
+    }
+
+    function filterPallets() {
+      let searchQuery = document.getElementById('search-pallet').value.trim().toUpperCase();
+      let typeFilter = document.getElementById('filter-type').value;
+      let locationFilter = document.getElementById('filter-location').value;
+
+      currentFilteredPallets = allPallets.filter(p => {
+        let matchSearch = p.pallet_id.toUpperCase().includes(searchQuery);
+        let matchType = (typeFilter === 'ALL') || (p.tipe_pallet === typeFilter);
+        let status = (p.status_lokasi || 'GUDANG').toUpperCase();
+        let matchLocation = (locationFilter === 'ALL') || (status === locationFilter.toUpperCase());
+        return matchSearch && matchType && matchLocation;
+      });
+
+      renderAccordionGrid(currentFilteredPallets);
+    }
+
+    function renderAccordionGrid(pallets) {
+      let container = document.getElementById('accordion-pallet-container');
+      if (pallets.length === 0) {
+        container.innerHTML = '<div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-center text-slate-500 text-xs">Tidak ada data palet yang sesuai.</div>';
+        return;
+      }
+
+      // Grouping berdasarkan tipe_pallet
+      let groups = {};
+      pallets.forEach(p => {
+        let type = p.tipe_pallet || 'Tipe Lain';
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(p);
+      });
+
+      let html = '';
+      let index = 0;
+      for (let type in groups) {
+        let items = groups[type];
+        let gudangCount = items.filter(i => !i.status_lokasi || i.status_lokasi.toUpperCase() === 'GUDANG').length;
+        let custCount = items.length - gudangCount;
+        let accordionId = `acc-body-${index}`;
+        let arrowId = `acc-arrow-${index}`;
+
+        let gridCards = items.map(p => {
+          let isGudang = !p.status_lokasi || p.status_lokasi.toUpperCase() === 'GUDANG';
+          let bgClass = isGudang ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-blue-500/10 border-blue-500/30 text-blue-400';
+          let badgeText = isGudang ? 'GUDANG' : p.status_lokasi;
+
+          return `
+            <div class="p-2.5 rounded-xl border ${bgClass} flex flex-col justify-between space-y-2 relative group hover:scale-105 transition-transform">
+              <div class="flex justify-between items-start">
+                <span class="font-bold text-xs font-mono text-white">${p.pallet_id}</span>
+                <button onclick="printSingleQR('${p.pallet_id}')" title="Cetak QR Code" class="text-slate-400 hover:text-white p-1 rounded transition-colors">
+                  <i class="fa-solid fa-print text-xs"></i>
+                </button>
+              </div>
+              <span class="text-[9px] font-semibold truncate uppercase" title="${badgeText}">${badgeText}</span>
+            </div>
+          `;
+        }).join('');
+
+        html += `
+          <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+            <!-- ACCORDION HEADER (KLIK UNTUK EXPAND/COLLAPSE) -->
+            <div onclick="toggleAccordion('${accordionId}', '${arrowId}')" class="p-4 bg-slate-900/90 hover:bg-slate-800/80 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-800/60">
+              <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+                  <i class="fa-solid fa-layer-group text-sm"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    ${type}
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                      ${items.length} Unit
+                    </span>
+                  </h3>
+                  <p class="text-[10px] text-slate-400 mt-0.5">
+                    Gudang: <span class="text-emerald-400 font-bold">${gudangCount}</span> | 
+                    Customer: <span class="text-blue-400 font-bold">${custCount}</span>
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-center gap-2 text-slate-400">
+                <span class="text-xs text-slate-500 font-medium hidden sm:inline">Lihat Item</span>
+                <i id="${arrowId}" class="fa-solid fa-chevron-down text-sm transition-transform duration-300"></i>
+              </div>
+            </div>
+
+            <!-- ACCORDION BODY GRID -->
+            <div id="${accordionId}" class="p-4 bg-slate-950/40">
+              <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
+                ${gridCards}
+              </div>
+            </div>
+          </div>
+        `;
+        index++;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function toggleAccordion(bodyId, arrowId) {
+      let body = document.getElementById(bodyId);
+      let arrow = document.getElementById(arrowId);
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        body.classList.add('hidden');
+        arrow.style.transform = 'rotate(-90deg)';
+      }
+    }
+
+    function renderHistory() {
+      let tbody = document.getElementById('history-table-body');
+      if (allTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada riwayat transaksi.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = allTransactions.map(t => {
+        let dateStr = new Date(t.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+        let isOut = t.jenis_transaksi.toUpperCase().includes('OUT');
+        let badgeJenis = isOut 
+          ? '<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-OUT</span>'
+          : '<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-semibold text-[10px]">GATE-IN</span>';
+
+        let palletsList = t.detail_transaksi ? t.detail_transaksi.map(d => d.pallet_id).join(', ') : '-';
+
+        return `
+          <tr class="hover:bg-slate-900/50 transition-colors">
+            <td class="p-3.5 text-slate-400 whitespace-nowrap">${dateStr}</td>
+            <td class="p-3.5">${badgeJenis}</td>
+            <td class="p-3.5 font-medium text-white">${t.lokasi_customer || 'Gudang Utama'}</td>
+            <td class="p-3.5 font-mono text-indigo-300">${t.job_no || '-'}</td>
+            <td class="p-3.5 font-mono text-slate-300 max-w-xs truncate" title="${palletsList}">${palletsList}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function switchTab(tab) {
+      let btnStatus = document.getElementById('tab-btn-status');
+      let btnHistory = document.getElementById('tab-btn-history');
+      let tabStatus = document.getElementById('tab-status');
+      let tabHistory = document.getElementById('tab-history');
+
+      if (tab === 'status') {
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabStatus.classList.remove('hidden');
+        tabHistory.classList.add('hidden');
+      } else {
+        btnHistory.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all bg-indigo-600 text-white shadow-md";
+        btnStatus.className = "flex-1 md:flex-initial px-5 py-2.5 rounded-xl font-bold text-xs transition-all text-slate-400 hover:text-white";
+        tabHistory.classList.remove('hidden');
+        tabStatus.classList.add('hidden');
+      }
+    }
+
+    function exportToExcel() {
+      let excelData = allPallets.map(p => ({
+        "ID Palet": p.pallet_id,
+        "Tipe Palet": p.tipe_pallet || "-",
+        "Status Lokasi": p.status_lokasi || "GUDANG",
+        "Terakhir Diupdate": p.updated_at ? new Date(p.updated_at).toLocaleString('id-ID') : "-"
+      }));
+
+      let worksheet = XLSX.utils.json_to_sheet(excelData);
+      let workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Palet");
+
+      let dateNow = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Laporan_Stok_Palet_${dateNow}.xlsx`);
+    }
+
+    function printSingleQR(palletId) {
+      generatePrintWindow([{ pallet_id: palletId }]);
+    }
+
+    function printFilteredQRs() {
+      if (currentFilteredPallets.length === 0) {
+        alert("Tidak ada palet yang dapat dicetak!");
+        return;
+      }
+      generatePrintWindow(currentFilteredPallets);
+    }
+
+    function generatePrintWindow(palletList) {
+      let win = window.open('', '_blank');
+      let labelCardsHtml = palletList.map(p => `
+        <div style="
+          border: 2px solid #000;
+          border-radius: 8px;
+          padding: 10px;
+          text-align: center;
+          width: 150px;
+          box-sizing: border-box;
+          page-break-inside: avoid;
+          display: inline-block;
+          margin: 6px;
+          font-family: Arial, sans-serif;
+        ">
+          <div style="font-size: 10px; font-weight: bold; color: #555; margin-bottom: 4px;">PROPERTY OF COMPANY</div>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${p.pallet_id}" style="width: 110px; height: 110px; display: block; margin: 0 auto;">
+          <div style="font-size: 16px; font-weight: bold; font-family: monospace; margin-top: 6px;">${p.pallet_id}</div>
+        </div>
+      `).join('');
+
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Cetak Label QR Palet</title>
+          <style>
+            body { margin: 15px; background: #fff; }
+            @media print {
+              body { margin: 0; }
+              @page { size: auto; margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+            ${labelCardsHtml}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          <\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
+    }
+  </script>
+</body>
+</html>
