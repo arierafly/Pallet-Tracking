@@ -275,42 +275,4 @@
 
       document.getElementById('stat-total').innerText = total;
       document.getElementById('stat-gudang').innerText = gudang;
-      document.getElementById('stat-customer').innerText = customer;
-      document.getElementById('stat-transaksi').innerText = allTransactions.length;
-    }
-
-    // --- FITUR KHUSUS ADMIN 1: RESET ALL TO GUDANG ---
-    async function resetAllPalletsToGudang() {
-      let inputPin = prompt("FITUR OTORITAS ADMIN:\nMasukkan PIN Admin untuk mengembalikan SEMUA palet ke GUDANG:");
-      if (inputPin === null) return;
-      if (inputPin !== ADMIN_PIN) {
-        alert("PIN Admin Salah! Akses ditolak.");
-        return;
-      }
-
-      if (!confirm("KONFIRMASI RESET:\nApakah Anda yakin ingin mengubah posisi SELURUH palet menjadi 'GUDANG' tanpa scan?")) {
-        return;
-      }
-
-      try {
-        let { error } = await db
-          .from('master_pallet')
-          .update({ status_lokasi: 'GUDANG', updated_at: new Date() })
-          .neq('pallet_id', '');
-
-        if (error) throw error;
-
-        alert("BERHASIL!\nSeluruh palet kini berstatus GUDANG.");
-        await loadAllData();
-      } catch (err) {
-        alert("Gagal reset status palet: " + err.message);
-      }
-    }
-
-    // --- FITUR KHUSUS ADMIN 2: HAPUS HISTORI TRANSAKSI ---
-    async function clearTransactionHistory() {
-      let inputPin = prompt("FITUR OTORITAS ADMIN:\nMasukkan PIN Admin untuk MENGHAPUS SEMUA HISTORI TRANSAKSI:");
-      if (inputPin === null) return;
-      if (inputPin !== ADMIN_PIN) {
-        alert("PIN Admin Salah! Akses ditolak.");
-        return
+      document.getElementById('stat-customer
